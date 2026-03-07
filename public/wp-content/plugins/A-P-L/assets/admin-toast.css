@@ -1,0 +1,63 @@
+#apl-toast-root {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 99999;
+}
+
+.apl-toast {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.apl-toast__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #dcdcde;
+}
+
+.apl-toast__title {
+  font-weight: 600;
+}
+
+.apl-toast__close {
+  border: 1px solid #c3c4c7;
+  background: #f6f7f7;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.apl-toast__body {
+  padding: 10px 12px;
+}
+
+.apl-toast__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.apl-toast__item + .apl-toast__item {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f1;
+}
+
+.apl-toast__item-name {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.apl-toast__item-msg {
+  color: #50575e;
+  line-height: 1.35;
+}

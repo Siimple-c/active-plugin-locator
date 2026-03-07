@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "name": "makeiteasy/slide",
+  "title": "Slide",
+  "parent": [
+    "makeiteasy/slider"
+  ],
+  "icon": "slides",
+  "description": "Slide for makeiteasy slider",
+  "apiVersion": 3,
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "render": "file:./render.php",
+  "category": "media",
+  "attributes": {
+    "slideWidth": {
+      "type": "string"
+    },
+    "hideSlide": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "supports": {
+    "dimensions": {
+      "aspectRatio": true,
+      "minHeight": true
+    },
+    "background": {
+      "backgroundImage": true,
+      "backgroundSize": true
+    },
+    "color": {
+      "background": true,
+      "text": false
+    },
+    "shadow": true,
+    "inserter": true
+  },
+  "usesContext": [
+    "makeiteasy-slider/slidesPerView",
+    "makeiteasy-slider/sliderSettings",
+    "makeiteasy-slider/useOnlyAdvancedSliderSettings"
+  ]
+}
