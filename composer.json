@@ -1,0 +1,14 @@
+{
+  "name": "siimple-c/active-plugin-locator",
+  "description": "Active Plugin Locator (WordPress plugin)",
+  "type": "project",
+  "require": {},
+  "require-dev": {
+    "squizlabs/php_codesniffer": "^3.10",
+    "wp-coding-standards/wpcs": "^3.0"
+  },
+  "scripts": {
+    "lint": "phpcs -q",
+    "lint:report": "phpcs"
+  }
+}
