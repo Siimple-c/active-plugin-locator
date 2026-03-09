@@ -1,8 +1,19 @@
 <?php
+/**
+ * Admin toast wiring for Active Plugin Locator.
+ *
+ * @package ActivePluginLocator
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Handles capturing activation events and rendering a one-time admin toast.
+ *
+ * @package ActivePluginLocator
+ */
 final class APL_Admin_Toast {
 
 	/**
@@ -12,6 +23,11 @@ final class APL_Admin_Toast {
 	 */
 	private static $payload = null;
 
+	/**
+	 * Register hooks.
+	 *
+	 * @return void
+	 */
 	public static function init(): void {
 		add_action( 'activated_plugin', array( __CLASS__, 'on_single_activation' ), 10, 2 );
 		add_action( 'activated_plugins', array( __CLASS__, 'on_bulk_activation' ), 10, 1 );
@@ -21,27 +37,48 @@ final class APL_Admin_Toast {
 		add_action( 'admin_footer', array( __CLASS__, 'render_mount' ) );
 	}
 
+	/**
+	 * Handle single plugin activation.
+	 *
+	 * @param string $plugin       Plugin basename (e.g., hello-dolly/hello.php).
+	 * @param bool   $network_wide Whether activated network-wide (unused in V1).
+	 * @return void
+	 */
 	public static function on_single_activation( string $plugin, bool $network_wide ): void {
+		// Kept for hook signature compatibility.
+		unset( $network_wide );
+
 		if ( ! current_user_can( 'activate_plugins' ) ) {
 			return;
 		}
+
 		APL_Activation_Queue::push_for_current_user( array( $plugin ) );
 	}
 
 	/**
-	 * @param array<int, string> $plugins
+	 * Handle bulk activation of plugins.
+	 *
+	 * @param array<int, string> $plugins Plugin basenames.
+	 * @return void
 	 */
 	public static function on_bulk_activation( array $plugins ): void {
 		if ( ! current_user_can( 'activate_plugins' ) ) {
 			return;
 		}
+
 		APL_Activation_Queue::push_for_current_user( $plugins );
 	}
 
+	/**
+	 * Prepare toast payload once per activation queue consumption.
+	 *
+	 * @return void
+	 */
 	public static function prepare_payload_once(): void {
 		if ( ! current_user_can( 'activate_plugins' ) ) {
 			return;
 		}
+
 		if ( ! is_admin() ) {
 			return;
 		}
@@ -59,7 +96,8 @@ final class APL_Admin_Toast {
 			if ( is_array( $data ) && ! empty( $data['Name'] ) ) {
 				$name = (string) $data['Name'];
 			}
-			if ( $name === '' ) {
+
+			if ( '' === $name ) {
 				$name = $basename;
 			}
 
@@ -72,7 +110,7 @@ final class APL_Admin_Toast {
 		}
 
 		self::$payload = array(
-			'title' => ( count( $items ) === 1 )
+			'title' => ( 1 === count( $items ) )
 				? __( 'Plugin activated', 'active-plugin-locator' )
 				: sprintf(
 					/* translators: %d = number of plugins activated */
@@ -83,6 +121,11 @@ final class APL_Admin_Toast {
 		);
 	}
 
+	/**
+	 * Enqueue toast assets when a payload exists.
+	 *
+	 * @return void
+	 */
 	public static function enqueue_assets(): void {
 		if ( empty( self::$payload ) ) {
 			return;
@@ -117,10 +160,16 @@ final class APL_Admin_Toast {
 		);
 	}
 
+	/**
+	 * Render the toast mount point.
+	 *
+	 * @return void
+	 */
 	public static function render_mount(): void {
 		if ( empty( self::$payload ) ) {
 			return;
 		}
+
 		echo '<div id="apl-toast-root" aria-live="polite" aria-atomic="true"></div>';
 	}
 }
