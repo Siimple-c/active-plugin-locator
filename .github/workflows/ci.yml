@@ -25,10 +25,13 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress
 
-      - name: Register WPCS
+      - name: Register PHPCS standards
         run: |
-          vendor/bin/phpcs --config-set installed_paths vendor/wp-coding-standards/wpcs
-          vendor/bin/phpcs -i
+        vendor/bin/phpcs --config-set installed_paths \
+        vendor/wp-coding-standards/wpcs,\
+        vendor/phpcsstandards/phpcsextra,\
+        vendor/phpcsstandards/phpcsutils
+      vendor/bin/phpcs -i
 
       - name: Run PHPCS (WPCS)
-        run: composer lint
+        run: vendor/bin/phpcs --standard=phpcs.xml.dist -q
