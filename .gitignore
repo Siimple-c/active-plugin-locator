@@ -1,1 +1,15 @@
 /vendor/
+
+# WordPress runtime
+public/wp-content/plugins/
+public/wp-content/uploads/
+public/wp-content/cache/
+public/wp-content/debug.log
+public/wp-content/autoptimize_404_handler.php
+
+# DDEV / local
+.vendor/
+node_modules/
+
+# OS
+.DS_Store

@@ -46,6 +46,25 @@
 
     li.appendChild(name);
     li.appendChild(msg);
+
+    if (Array.isArray(item.links) && item.links.length > 0) {
+      const linksList = document.createElement("ul");
+      linksList.className = "apl-toast__links";
+
+      item.links.forEach((linkItem) => {
+        const linkLi = document.createElement("li");
+
+        const anchor = document.createElement("a");
+        anchor.href = linkItem.url;
+        anchor.textContent = linkItem.label || linkItem.url;
+
+        linkLi.appendChild(anchor);
+        linksList.appendChild(linkLi);
+      });
+
+      li.appendChild(linksList);
+    }
+
     list.appendChild(li);
   });
 
@@ -56,12 +75,10 @@
 
   root.appendChild(toast);
 
-  // Auto-hide after ~10s (still dismissible).
   window.setTimeout(() => {
     if (toast && toast.parentNode) toast.remove();
   }, 10000);
 
-  // ESC closes.
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && toast && toast.parentNode) toast.remove();
   });
