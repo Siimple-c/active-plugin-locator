@@ -65,6 +65,23 @@ final class APL_Activation_Queue {
 	}
 
 	/**
+	 * Read the current user's queue without clearing it.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function peek_for_current_user(): array {
+		$user_id = get_current_user_id();
+		if ( 0 >= $user_id ) {
+			return array();
+		}
+
+		$key   = self::key_for_user( $user_id );
+		$queue = get_transient( $key );
+
+		return is_array( $queue ) ? array_values( array_filter( $queue, 'is_string' ) ) : array();
+	}
+
+	/**
 	 * Consume and clear the current user's queue (one-time behavior).
 	 *
 	 * @return array<int, string>
