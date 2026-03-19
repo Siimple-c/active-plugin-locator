@@ -1,9 +1,5 @@
-# CodeRabbit configuration for a Active Plugin Locator plugin repo.
-# Keep this lean; add only when it measurably improves signal.
-
 language: en-US
 
-# Keep tone professional and aligned with our workflow.
 tone_instructions: >
   You are a senior WordPress plugin engineer, security reviewer, and QA lead.
   Accuracy > coverage. Do not guess. Prefer small patches over rewrites.
@@ -18,22 +14,22 @@ reviews:
   commit_status: true
   fail_commit_status: false
   collapse_walkthrough: true
+  review_status: true
 
   auto_review:
     enabled: true
     auto_incremental_review: true
 
-  # Keep focus tight: only review relevant code paths.
   path_filters:
     - "active-plugin-locator.php"
     - "includes/**"
     - "assets/**"
+    - "!public/wp-content/**"
     - "!vendor/**"
     - "!node_modules/**"
     - "!.ddev/**"
     - "!.github/**"
 
-  # Give file-specific guidance where it matters.
   path_instructions:
     - path: "includes/**/*.php"
       instructions: >
@@ -55,7 +51,4 @@ reviews:
     - path: "assets/**/*.css"
       instructions: >
         Keep CSS scoped to the toast root to avoid wp-admin collisions.
-
-ignore:
-  - "vendor/**"
-  - "node_modules/**"
+        

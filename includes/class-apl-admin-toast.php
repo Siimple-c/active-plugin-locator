@@ -17,11 +17,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class APL_Admin_Toast {
 
 	/**
-	 * Cached payload for this request after consuming queue.
+	 * Pending plugin basenames for this request.
 	 *
-	 * @var array<string, mixed>|null
+	 * @var array<int, string>
 	 */
-	private static $payload = null;
+	private static $pending_plugins = array();
+
+	/**
+	 * High-confidence menu discovery helper.
+	 *
+	 * @var APL_Menu_Discovery|null
+	 */
+	private static $menu_discovery = null;
+
+	/**
+	 * Medium-confidence row action discovery helper.
+	 *
+	 * @var APL_Row_Action_Discovery|null
+	 */
+	private static $row_action_discovery = null;
 
 	/**
 	 * Register hooks.
@@ -31,8 +45,9 @@ final class APL_Admin_Toast {
 	public static function init(): void {
 		add_action( 'activated_plugin', array( __CLASS__, 'on_single_activation' ), 10, 2 );
 		add_action( 'activated_plugins', array( __CLASS__, 'on_bulk_activation' ), 10, 1 );
-
-		add_action( 'admin_init', array( __CLASS__, 'prepare_payload_once' ) );
+		// Temporarily disable Slice 3 until the runtime fatal is isolated.
+		add_action( 'admin_menu', array( __CLASS__, 'capture_menu_candidates' ), PHP_INT_MAX );
+		add_action( 'admin_init', array( __CLASS__, 'prepare_pending_plugins' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_footer', array( __CLASS__, 'render_mount' ) );
 	}
@@ -40,12 +55,11 @@ final class APL_Admin_Toast {
 	/**
 	 * Handle single plugin activation.
 	 *
-	 * @param string $plugin       Plugin basename (e.g., hello-dolly/hello.php).
-	 * @param bool   $network_wide Whether activated network-wide (unused in V1).
+	 * @param string $plugin       Plugin basename.
+	 * @param bool   $network_wide Whether activated network-wide.
 	 * @return void
 	 */
 	public static function on_single_activation( string $plugin, bool $network_wide ): void {
-		// Kept for hook signature compatibility.
 		unset( $network_wide );
 
 		if ( ! current_user_can( 'activate_plugins' ) ) {
@@ -56,7 +70,7 @@ final class APL_Admin_Toast {
 	}
 
 	/**
-	 * Handle bulk activation of plugins.
+	 * Handle bulk plugin activation.
 	 *
 	 * @param array<int, string> $plugins Plugin basenames.
 	 * @return void
@@ -70,29 +84,98 @@ final class APL_Admin_Toast {
 	}
 
 	/**
-	 * Prepare toast payload once per activation queue consumption.
+	 * Load pending plugins for this request if needed.
 	 *
 	 * @return void
 	 */
-	public static function prepare_payload_once(): void {
-		if ( ! current_user_can( 'activate_plugins' ) ) {
+	private static function ensure_pending_plugins_loaded(): void {
+		if ( ! empty( self::$pending_plugins ) ) {
 			return;
 		}
 
-		if ( ! is_admin() ) {
+		if ( ! is_admin() || ! current_user_can( 'activate_plugins' ) ) {
 			return;
 		}
 
-		$queue = APL_Activation_Queue::consume_for_current_user();
-		if ( empty( $queue ) ) {
+		self::$pending_plugins = APL_Activation_Queue::peek_for_current_user();
+	}
+
+	/**
+	 * Capture high-confidence menu candidates from registered admin menus.
+	 *
+	 * @return void
+	 */
+	public static function capture_menu_candidates(): void {
+		self::ensure_pending_plugins_loaded();
+
+		if ( empty( self::$pending_plugins ) ) {
 			return;
 		}
 
+		if ( ! class_exists( 'APL_Menu_Discovery' ) ) {
+			return;
+		}
+
+		self::$menu_discovery = new APL_Menu_Discovery( self::$pending_plugins );
+		self::$menu_discovery->capture_from_registered_menus();
+	}
+
+	/**
+	 * Prepare medium-confidence row action discovery for this request.
+	 *
+	 * @return void
+	 */
+	public static function prepare_pending_plugins(): void {
+		self::ensure_pending_plugins_loaded();
+
+		if ( empty( self::$pending_plugins ) ) {
+			return;
+		}
+
+		self::$row_action_discovery = new APL_Row_Action_Discovery( self::$pending_plugins );
+		self::$row_action_discovery->register();
+	}
+
+	/**
+	 * Enqueue toast assets only when a queue exists.
+	 *
+	 * @return void
+	 */
+	public static function enqueue_assets(): void {
+		self::ensure_pending_plugins_loaded();
+
+		if ( empty( self::$pending_plugins ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'apl-admin-toast',
+			APL_PLUGIN_URL . 'assets/admin-toast.css',
+			array(),
+			APL_VERSION
+		);
+
+		wp_enqueue_script(
+			'apl-admin-toast',
+			APL_PLUGIN_URL . 'assets/admin-toast.js',
+			array(),
+			APL_VERSION,
+			true
+		);
+	}
+
+	/**
+	 * Build the final toast payload.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function build_payload(): array {
 		$items = array();
-		foreach ( $queue as $basename ) {
-			$data = get_plugin_data( WP_PLUGIN_DIR . '/' . $basename, false, false );
 
+		foreach ( self::$pending_plugins as $basename ) {
+			$data = get_plugin_data( WP_PLUGIN_DIR . '/' . $basename, false, false );
 			$name = '';
+
 			if ( is_array( $data ) && ! empty( $data['Name'] ) ) {
 				$name = (string) $data['Name'];
 			}
@@ -101,19 +184,54 @@ final class APL_Admin_Toast {
 				$name = $basename;
 			}
 
+			$high_candidates = array();
+			if ( self::$menu_discovery instanceof APL_Menu_Discovery ) {
+				$high_candidates = self::$menu_discovery->get_candidates( $basename );
+			}
+
+			if ( ! empty( $high_candidates ) ) {
+				$items[] = array(
+					'plugin'  => $basename,
+					'name'    => $name,
+					'message' => ( 1 === count( $high_candidates ) )
+						? __( 'Manage in:', 'active-plugin-locator' )
+						: __( 'We found multiple management locations:', 'active-plugin-locator' ),
+					'links'   => $high_candidates,
+				);
+
+				continue;
+			}
+
+			$medium_candidates = array();
+			if ( self::$row_action_discovery instanceof APL_Row_Action_Discovery ) {
+				$medium_candidates = self::$row_action_discovery->get_candidates( $basename );
+			}
+
+			if ( ! empty( $medium_candidates ) ) {
+				$items[] = array(
+					'plugin'  => $basename,
+					'name'    => $name,
+					'message' => ( 1 === count( $medium_candidates ) )
+						? __( 'Likely manage here:', 'active-plugin-locator' )
+						: __( 'We found multiple likely locations:', 'active-plugin-locator' ),
+					'links'   => $medium_candidates,
+				);
+
+				continue;
+			}
+
 			$items[] = array(
 				'plugin'  => $basename,
 				'name'    => $name,
-				// Slice 1: conservative default (no discovery yet).
 				'message' => __( 'No admin settings page detected. It may run automatically or appear elsewhere.', 'active-plugin-locator' ),
 			);
 		}
 
-		self::$payload = array(
+		return array(
 			'title' => ( 1 === count( $items ) )
 				? __( 'Plugin activated', 'active-plugin-locator' )
 				: sprintf(
-					/* translators: %d = number of plugins activated */
+					/* translators: %d: number of activated plugins. */
 					__( '%d plugins activated', 'active-plugin-locator' ),
 					count( $items )
 				),
@@ -122,54 +240,34 @@ final class APL_Admin_Toast {
 	}
 
 	/**
-	 * Enqueue toast assets when a payload exists.
-	 *
-	 * @return void
-	 */
-	public static function enqueue_assets(): void {
-		if ( empty( self::$payload ) ) {
-			return;
-		}
-
-		$handle = 'apl-admin-toast';
-
-		wp_enqueue_style(
-			$handle,
-			APL_PLUGIN_URL . 'assets/admin-toast.css',
-			array(),
-			APL_VERSION
-		);
-
-		wp_enqueue_script(
-			$handle,
-			APL_PLUGIN_URL . 'assets/admin-toast.js',
-			array(),
-			APL_VERSION,
-			true
-		);
-
-		wp_localize_script(
-			$handle,
-			'APL_TOAST_DATA',
-			array(
-				'payload' => self::$payload,
-				'i18n'    => array(
-					'close' => __( 'Dismiss', 'active-plugin-locator' ),
-				),
-			)
-		);
-	}
-
-	/**
-	 * Render the toast mount point.
+	 * Render the toast mount point and inject payload.
 	 *
 	 * @return void
 	 */
 	public static function render_mount(): void {
-		if ( empty( self::$payload ) ) {
+		self::ensure_pending_plugins_loaded();
+
+		if ( empty( self::$pending_plugins ) ) {
 			return;
 		}
 
+		$payload = self::build_payload();
+
+		wp_add_inline_script(
+			'apl-admin-toast',
+			'window.APL_TOAST_DATA = ' . wp_json_encode(
+				array(
+					'payload' => $payload,
+					'i18n'    => array(
+						'close' => __( 'Dismiss', 'active-plugin-locator' ),
+					),
+				)
+			) . ';',
+			'before'
+		);
+
 		echo '<div id="apl-toast-root" aria-live="polite" aria-atomic="true"></div>';
+
+		APL_Activation_Queue::consume_for_current_user();
 	}
 }
